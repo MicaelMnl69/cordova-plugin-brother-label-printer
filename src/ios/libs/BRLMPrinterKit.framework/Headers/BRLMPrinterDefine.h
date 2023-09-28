@@ -41,6 +41,8 @@ typedef NS_ENUM(NSInteger, BRLMPrinterModel) {
     BRLMPrinterModelQL_710W,
     BRLMPrinterModelQL_720NW,
     BRLMPrinterModelQL_810W,
+    BRLMPrinterModelQL_810Wc,
+    BRLMPrinterModelQL_810WC,
     BRLMPrinterModelQL_820NWB,
     BRLMPrinterModelQL_1110NWB,
     BRLMPrinterModelQL_1115NWB,
