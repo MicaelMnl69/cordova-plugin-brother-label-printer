@@ -183,8 +183,6 @@ public abstract class BasePrint {
                 case QL_720NW:
                 case QL_800:
                 case QL_810W:
-                case QL_810Wc(70, QL_580N):
-                case QL_810WC(71, QL_580N):
                 case QL_820NWB:
                     mPrinterInfo.labelNameIndex = LabelInfo.QL700.valueOf(
                             sharedPreferences.getString("paperSize", LabelInfo.QL700.W62.toString())).ordinal();
@@ -676,8 +674,6 @@ public abstract class BasePrint {
             case PT_P900W:
             case PT_P950NW:
             case QL_810W:
-            case case QL_810Wc(70, QL_580N):
-            case case QL_810WC(71, QL_580N):
             case QL_800:
             case QL_820NWB:
             case PT_P300BT:

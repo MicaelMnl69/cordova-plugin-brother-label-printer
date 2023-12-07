@@ -60,8 +60,6 @@ public class BrotherPrinter extends CordovaPlugin {
 
     private static PrinterInfo.Model[] supportedModels = {
             PrinterInfo.Model.QL_810W,
-            QL_810Wc(70, QL_580N),
-            QL_810WC(71, QL_580N),
             PrinterInfo.Model.QL_720NW,
             PrinterInfo.Model.QL_820NWB,
             PrinterInfo.Model.QL_1110NWB,
