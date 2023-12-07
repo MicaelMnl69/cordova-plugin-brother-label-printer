@@ -1,6 +1,6 @@
 {
   "name": "cordova-plugin-brother-label-printer",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "Cordova plugin for brother label printers",
   "cordova": {
     "id": "cordova-plugin-brother-label-printer",
