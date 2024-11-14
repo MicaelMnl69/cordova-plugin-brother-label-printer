@@ -60,35 +60,53 @@
 }
 
 - (void)main {
-  //  NSLog(@"==== in main with callback id               ");
+     self.isExecutingForWLAN = YES;
+     [self.ptp setIPAddress:self.ipAddress];
 
-    self.isExecutingForWLAN = YES;
+     // Commencez la communication avec l'imprimante
+     if ([self.ptp startCommunication]) {
+         self.communicationResultForWLAN = YES;
 
-    [self.ptp setIPAddress:self.ipAddress];
+         BRPtouchPrinterStatus *status = [[BRPtouchPrinterStatus alloc] init];
+         int error = [self.ptp getStatus:&status];
+         NSLog(@"Statue de l'imprimante : %d", ERROR_NONE_);
 
-    if ([self.ptp isPrinterReady]) {
-        self.communicationResultForWLAN = [self.ptp startCommunication];
-        if (self.communicationResultForWLAN) {
+         if (error == ERROR_NONE_ || error == 1) {
+             // Vérifiez les erreurs dans status.statusInfo.byErrorInf et status.statusInfo.byErrorInf2
+             if (status.statusInfo.byErrorInf == 0 && status.statusInfo.byErrorInf2 == 0) {
+                 // Aucun problème détecté, l'imprimante est prête
+                 NSLog(@"L'imprimante est prête.");
 
-            [self.ptp setPrintInfo:self.printInfo];
+                 // Configurer les informations d'impression
+                 [self.ptp setPrintInfo:self.printInfo];
 
-            _errorCode = [self.ptp printImage:self.imgRef copy:self.numberOfPaper];
-            NSLog(@"==== in main error code in instance is %d", self.errorCode);
+                 // Démarrer l'impression de l'image
+                 _errorCode = [self.ptp printImage:self.imgRef copy:self.numberOfPaper];
 
-            if (_errorCode == ERROR_NONE_) {
-                PTSTATUSINFO resultstatus;
-                [self.ptp getPTStatus:&resultstatus];
-                _resultStatus = resultstatus;
-            }
+                 if (_errorCode == ERROR_NONE_ || 1) {
+                      NSLog(@"Impression avec ok !!!");
 
-        }
-        [self.ptp endCommunication];
+                     PTSTATUSINFO resultstatus;
+                     [self.ptp getPTStatus:&resultstatus];
+                     _resultStatus = resultstatus;
+                 }
+             } else {
+                 self.communicationResultForWLAN = NO;
 
-    } else {
-        self.communicationResultForWLAN = NO;
-    }
+                 NSLog(@"Erreur d'imprimante détectée : byErrorInf = %d, byErrorInf2 = %d", status.statusInfo.byErrorInf, status.statusInfo.byErrorInf2);
+             }
+         } else {
+             self.communicationResultForWLAN = NO;
+             NSLog(@"Erreur lors de la récupération du statut de l'imprimante : %d", error);
+         }
 
-    self.isExecutingForWLAN = NO;
-    self.isFinishedForWLAN = YES;
-}
+         [self.ptp endCommunication];
+     } else {
+         self.communicationResultForWLAN = NO;
+         NSLog(@"Impossible de démarrer la communication avec l'imprimante");
+     }
+
+     self.isExecutingForWLAN = NO;
+     self.isFinishedForWLAN = YES;
+ }
 @end
