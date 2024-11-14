@@ -515,7 +515,7 @@ public abstract class BasePrint {
         CustomPaperInfo customPaperInfo;
         switch (paperKind) {
             case DIE_CUT:
-                customPaperInfo = CustomPaperInfo.newCustomDiaCutPaper(printerModel, unit, width, length, rightMargin, leftMargin, topMargin, bottomMargin, labelPitch);
+                customPaperInfo = CustomPaperInfo.newCustomRollPaper(printerModel, unit, width, rightMargin, leftMargin, topMargin);
                 break;
             case MARKED_ROLL:
                 customPaperInfo = CustomPaperInfo.newCustomMarkRollPaper(printerModel, unit, width, length, rightMargin, leftMargin, topMargin, bottomMargin, markPosition, markHeight);
@@ -526,7 +526,7 @@ public abstract class BasePrint {
                 break;
         }
 
-        List<Map<CustomPaperInfo.ErrorParameter, CustomPaperInfo.ErrorDetail>> errors = mPrinterInfo.setCustomPaperInfo(customPaperInfo);
+        mPrinterInfo.setCustomPaperInfo(customPaperInfo);
         if (errors.isEmpty()) {
             return BasePrintResult.success();
         } else {
