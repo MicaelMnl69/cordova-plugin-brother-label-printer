@@ -284,15 +284,20 @@ public class BrotherPrinter extends CordovaPlugin {
         return results;
     }
 
-    private List<DiscoveredPrinter> enumerateBluetoothPrinters() {
-        ArrayList<DiscoveredPrinter> results = new ArrayList<DiscoveredPrinter>();
+    private List<DiscoveredPrinter> enumerateBluetoothPrinters(final CallbackContext callbackctx) {
+
+        ArrayList<DiscoveredPrinter> results = new ArrayList<>();
         try {
             BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
             if (bluetoothAdapter == null) {
+                sendError(callbackctx, null, "No Bluetooth adapter found.");
+
                 return results;
             }
 
             if (!bluetoothAdapter.isEnabled()) {
+                sendError(callbackctx, null, "Bluetooth not enabled. Requesting enable.");
+
                 Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
                 enableBtIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 cordova.getActivity().startActivity(enableBtIntent);
@@ -300,6 +305,8 @@ public class BrotherPrinter extends CordovaPlugin {
 
             Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
             if (pairedDevices == null || pairedDevices.size() == 0) {
+                sendError(callbackctx, null, "No paired Bluetooth devices found.");
+
                 return results;
             }
 
@@ -309,10 +316,11 @@ public class BrotherPrinter extends CordovaPlugin {
                 if (printer.model == null) {
                     continue;
                 }
+
                 results.add(printer);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            sendError(callbackctx, null,   "Error enumerating Bluetooth printers");
         }
 
         return results;
@@ -349,11 +357,12 @@ public class BrotherPrinter extends CordovaPlugin {
     }
 
     private void findBluetoothPrinters(final CallbackContext callbackctx) {
+
         cordova.getThreadPool().execute(new Runnable() {
             @Override
             public void run() {
                 try {
-                    List<DiscoveredPrinter> discoveredPrinters = enumerateBluetoothPrinters();
+                    List<DiscoveredPrinter> discoveredPrinters = enumerateBluetoothPrinters(callbackctx);
                     sendDiscoveredPrinters(callbackctx, discoveredPrinters);
                 } catch (Throwable t) {
                     sendError(callbackctx, t, "Failed to find BlueTooth printers");
@@ -368,7 +377,7 @@ public class BrotherPrinter extends CordovaPlugin {
             public void run() {
                 try {
                     List<DiscoveredPrinter> allPrinters = enumerateNetPrinters();
-                    allPrinters.addAll(enumerateBluetoothPrinters());
+                    allPrinters.addAll(enumerateBluetoothPrinters(callbackctx));
                     sendDiscoveredPrinters(callbackctx, allPrinters);
                 } catch (Throwable t) {
                     sendError(callbackctx, t, "Failed to find printers");
