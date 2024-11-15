@@ -320,7 +320,7 @@ public class BrotherPrinter extends CordovaPlugin {
                 results.add(printer);
             }
         } catch (Exception e) {
-            sendError(callbackctx, null,   "Error enumerating Bluetooth printers");
+            sendError(callbackctx, e,   "Error enumerating Bluetooth printers");
         }
 
         return results;
