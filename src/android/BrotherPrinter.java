@@ -63,7 +63,10 @@ public class BrotherPrinter extends CordovaPlugin {
             PrinterInfo.Model.QL_720NW,
             PrinterInfo.Model.QL_820NWB,
             PrinterInfo.Model.QL_1110NWB,
-            PrinterInfo.Model.TD_2120N
+            PrinterInfo.Model.TD_2120N,
+            PrinterInfo.Model.TD_2130N,
+            PrinterInfo.Model.TD_2020,
+            PrinterInfo.Model.TD_4550DNWB
     };
 
     private MsgHandle mHandle;
@@ -151,6 +154,8 @@ public class BrotherPrinter extends CordovaPlugin {
         public String paperLabelName;
         public String orientation;
         public String numberOfCopies;
+        public String topMargin;
+        public String leftMargin;
         public String includeBatteryStatus;
         public String customPaperFilePath;
 
@@ -185,7 +190,11 @@ public class BrotherPrinter extends CordovaPlugin {
             PrinterInfo.Model[] models = PrinterInfo.Model.values();
             for (PrinterInfo.Model model : models) {
                 String modelName = model.toString().replaceAll("_", "-");
+                Log.i(TAG, "modelName : "+modelName);
+
                 if (printer.modelName.endsWith(modelName)) {
+                    Log.i(TAG, "model : "+model);
+
                     this.model = model;
                     break;
                 }
@@ -232,6 +241,14 @@ public class BrotherPrinter extends CordovaPlugin {
                 numberOfCopies = object.getString("numberOfCopies");
             }
 
+            if (object.has("topMargin")) {
+                topMargin = object.getString("topMargin");
+            }
+
+            if (object.has("leftMargin")) {
+                leftMargin = object.getString("leftMargin");
+            }
+
             if(object.has("customPaperFilePath")) {
                 customPaperFilePath = object.getString("customPaperFilePath");
             }
@@ -264,6 +281,7 @@ public class BrotherPrinter extends CordovaPlugin {
 
     private List<DiscoveredPrinter> enumerateNetPrinters() {
         ArrayList<DiscoveredPrinter> results = new ArrayList<DiscoveredPrinter>();
+
         try {
             Printer myPrinter = new Printer();
             PrinterInfo myPrinterInfo = new PrinterInfo();
@@ -388,12 +406,12 @@ public class BrotherPrinter extends CordovaPlugin {
 
     private void setPrinter(JSONArray args, final CallbackContext callbackctx) {
         try {
+
             JSONObject obj = args.getJSONObject(0);
             DiscoveredPrinter printer = new DiscoveredPrinter(obj);
 
             SharedPreferences sharedPreferences = PreferenceManager
                     .getDefaultSharedPreferences(cordova.getActivity());
-
             SharedPreferences.Editor editor = sharedPreferences.edit();
 
             editor.putString("printerModel", printer.model.toString());
@@ -403,11 +421,13 @@ public class BrotherPrinter extends CordovaPlugin {
             editor.putString("paperSize", printer.paperLabelName != null ? printer.paperLabelName : LabelInfo.QL700.W62.toString());
             editor.putString("orientation", printer.orientation != null ? printer.orientation : PrinterInfo.Orientation.LANDSCAPE.toString());
             editor.putString("numberOfCopies", printer.numberOfCopies);
+            editor.putString("topMargin", printer.topMargin);
+            editor.putString("leftMargin", printer.leftMargin);
 
             if(printer.customPaperFilePath != null && !printer.customPaperFilePath.isEmpty()) {
                 String targetBinFolder = cordova.getActivity()
                         .getExternalFilesDir("customPaperFileSet/").toString();
-                copyBinFile("www/" + printer.customPaperFilePath, targetBinFolder);
+                copyBinFile("public/" + printer.customPaperFilePath, targetBinFolder);
                 editor.putString("customSetting", targetBinFolder + new File(printer.customPaperFilePath).getName());
             }
 
@@ -626,6 +646,8 @@ public class BrotherPrinter extends CordovaPlugin {
             out.flush();
             out.close();
             out = null;
+            Log.i("Brother/SDKEvent", "file copied :"+filename);
+
         } catch (Exception e) {
             Log.e("Brother/SDKEvent", "Exception in copyBinFile() " + e.toString());
         }

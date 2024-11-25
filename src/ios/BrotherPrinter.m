@@ -52,9 +52,23 @@
             @"Brother QL-720NW",
             @"Brother QL-810W",
             @"Brother QL-820NWB",
-            @"Brother TD-2120N"];
-
-
+            @"Brother TD-2120N",
+            @"Brother TD-2120N",
+            @"Brother TD-2125NWB",
+            @"Brother TD-2130N",
+            @"Brother TD-4550DNWB",
+            @"Brother TD-4520DN",
+            @"Brother TD-TD2125NWB",
+            @"Brother TD-2135N",
+            @"Brother TD-2135NWB",
+            @"Brother TD-2320D",
+            @"Brother TD-2320DF",
+            @"Brother TD-2350D",
+            @"Brother TD-2350DF",
+            @"Brother TD-2350DSA",
+            @"Brother TD-2030A",
+            @"Brother TD-2020",
+    ];
 }
 
 - (NSArray *)suffixedPrinterList:(NSArray *)list {
@@ -72,10 +86,11 @@
     [deviceList enumerateObjectsUsingBlock:^(EAAccessory *deviceInfo, NSUInteger idx, BOOL *stop) {
         NSMutableDictionary *dict = [NSMutableDictionary dictionary];
 
+        NSLog(@"==== paired devices              = %@", deviceInfo);
 
         dict[@"ipAddress"] = @"";
 
-        dict[@"modelName"] = [NSString stringWithFormat:@"%@", deviceInfo.name];
+        dict[@"modelName"] = [NSString stringWithFormat:@"%@", deviceInfo.modelNumber];
         dict[@"serialNumber"] = [NSString stringWithFormat:@"%@", deviceInfo.serialNumber];
         dict[@"port"] = @"BLUETOOTH";
 
@@ -151,7 +166,10 @@
     NSArray *deviceList = [_networkManager getPrinterNetInfo];
     __block NSMutableArray *resultList = [NSMutableArray array];
 
+    NSLog(@"==== resultat              = %@", resultList);
     [deviceList enumerateObjectsUsingBlock:^(BRPtouchDeviceInfo *deviceInfo, NSUInteger idx, BOOL *stop) {
+        NSLog(@"==== didFinishSearch= %@", deviceInfo);
+
         NSMutableDictionary *dict = [NSMutableDictionary dictionary];
         if (deviceInfo.strIPAddress && ![deviceInfo.strIPAddress isEqual:@""]) {
             dict[@"ipAddress"] = deviceInfo.strIPAddress;
@@ -207,6 +225,7 @@
 }
 
 - (void)findBluetoothPrinters:(CDVInvokedUrlCommand *)command {
+
 //	[self.commandDelegate runInBackground:^{
     [self pairedDevicesWithCompletion:^(NSArray *bluetoothPrinters, NSError *error) {
         if (error) {
@@ -271,7 +290,7 @@
     NSString *orientation = obj[@"orientation"];
     NSString *customPaperFilePath = obj[@"customPaperFilePath"];
     NSString *serialNumber = obj[@"serialNumber"];
-    
+
     if (!modelName) {
         [self.commandDelegate
                 sendPluginResult:[CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Expected a \"modelName\" key in the given object"]
@@ -291,7 +310,7 @@
     }
 
     if ([@"BLUETOOTH" isEqualToString:port]) {
-        
+
         if(!serialNumber){
             [self.commandDelegate
                     sendPluginResult:[CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Expected a \"serialNumber\" key in the given object for BlueTooth devices"]
@@ -304,7 +323,7 @@
         [userDefaults
                 setObject:@"1"
                    forKey:kIsBluetooth];
-        
+
         [userDefaults
                 setObject:serialNumber
                    forKey:kSerialNumber];
@@ -317,7 +336,7 @@
         [userDefaults
                 setObject:@"0"
                    forKey:kIsBluetooth];
-        
+
         [userDefaults
                 setObject:@"0"
                    forKey:kSerialNumber];
@@ -350,10 +369,17 @@
                        forKey:kPrintOrientationKey];
         }
     }
-    
+
     if(customPaperFilePath) {
-        NSString *absoluteCustomPaperFilePath = [NSString stringWithFormat:@"%@/%@", @"www", [customPaperFilePath stringByDeletingPathExtension]];
+        NSString *absoluteCustomPaperFilePath = [NSString stringWithFormat:@"%@/%@", @"public", [customPaperFilePath stringByDeletingPathExtension]];
         _customPaperFilePath = [[NSBundle mainBundle] pathForResource:absoluteCustomPaperFilePath ofType:@"bin"];
+
+        // Log the result
+        if (_customPaperFilePath) {
+            NSLog(@"✅ Custom paper file exists: %@", _customPaperFilePath);
+        } else {
+            NSLog(@"❌ Custom paper file NOT found. Expected path: %@", absoluteCustomPaperFilePath);
+        }
     }
 
     [userDefaults synchronize];
@@ -527,11 +553,10 @@
 
     } else if (isWifi == 1) {
         _ptp = [[BRPtouchPrinter alloc] initWithPrinterName:finalDeviceName interface:CONNECTION_TYPE_WLAN];
-       
+
        if ([fileManager fileExistsAtPath:_customPaperFilePath]){
             [_ptp setCustomPaperFile:_customPaperFilePath];
         }
-        //    [_ptp setIPAddress:ipAddress];
     } else {
         _ptp = nil;
     }

@@ -37,7 +37,7 @@ BrotherPrinter.prototype = {
             return
         }
         cordova.exec(onSuccess, onError, 'BrotherPrinter', 'sendUSBConfig', [data])
-    }
+    },
 }
 var plugin = new BrotherPrinter()
 module.exports = plugin

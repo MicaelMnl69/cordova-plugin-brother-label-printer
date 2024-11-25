@@ -29,12 +29,16 @@ import com.brother.ptouch.sdk.PrinterStatus;
 import com.brother.ptouch.sdk.Unit;
 import com.brother.ptouch.sdk.printdemo.common.Common;
 import com.brother.ptouch.sdk.printdemo.common.MsgHandle;
-
+import com.brother.ptouch.sdk.PrinterInfo.Margin;
+import com.brother.ptouch.sdk.PrinterInfo.Align;
+import com.brother.ptouch.sdk.PrinterInfo.VAlign;
 import java.util.List;
 import java.util.Map;
 
 import static com.threescreens.cordova.plugin.brotherprinter.BrotherPrinter.TAG;
 import static com.threescreens.cordova.plugin.brotherprinter.PrinterInputParameterConstant.INCLUDE_BATTERY_STATUS;
+
+import org.apache.cordova.LOG;
 
 @SuppressWarnings("ALL")
 public abstract class BasePrint {
@@ -98,7 +102,10 @@ public abstract class BasePrint {
      */
     public BasePrintResult setPrinterInfo() {
         getPreferences();
+
         BasePrintResult customPaperResult = setCustomPaper();
+        Log.i(TAG,"setPrinterInfo "+customPaperResult);
+
         boolean setPrinterInfoResult = mPrinter.setPrinterInfo(mPrinterInfo);
         if (mPrinterInfo.port == PrinterInfo.Port.USB) {
             while (true) {
@@ -164,6 +171,8 @@ public abstract class BasePrint {
      * get the printer settings from the SharedPreferences
      */
     private void getPreferences() {
+
+        Log.i(TAG, "(isLabelPrinter(mPrinterInfo.printerModel) " +(isLabelPrinter(mPrinterInfo.printerModel)));
         if (mPrinterInfo == null) {
             mPrinterInfo = new PrinterInfo();
             return;
@@ -251,14 +260,32 @@ public abstract class BasePrint {
                     break;
             }
         } else {
-            mPrinterInfo.paperSize = PrinterInfo.PaperSize
-                    .valueOf(sharedPreferences.getString("paperSize", PrinterInfo.PaperSize.A4.name()));
+            mPrinterInfo.paperSize = PrinterInfo.PaperSize.CUSTOM;
             switch (mPrinterInfo.printerModel) {
                 case TD_4410D:
                 case TD_4420DN:
                 case TD_4510D:
                 case TD_4520DN:
+                case TD_2020:
+                case TD_2130N:
+                    Log.i(TAG, "customPaperWidth: " + mPrinterInfo.customPaperWidth);
+                    Log.i(TAG, "customPaperLength: " + mPrinterInfo.customPaperLength);
+                    Log.i(TAG, "printMode" + mPrinterInfo.printMode);
+                    Log.i(TAG, "MarginTop" + sharedPreferences.getString("topMargin", ""));
+                    mPrinterInfo.labelMargin = 30;
+                    mPrinterInfo.margin = new Margin(5, 10);
+                    mPrinterInfo.align = Align.CENTER;
+                    mPrinterInfo.valign = VAlign.MIDDLE;
+                    mPrinterInfo.paperPosition = Align.CENTER;
+                    mPrinterInfo.printMode = PrinterInfo.PrintMode.FIT_TO_PAPER;
+                    mPrinterInfo.printQuality = PrinterInfo.PrintQuality.HIGH_RESOLUTION;
+                    mPrinterInfo.isAutoCut = Boolean.parseBoolean(sharedPreferences.getString("autoCut", TRUE));
+                    mPrinterInfo.isCutAtEnd = Boolean.parseBoolean(sharedPreferences.getString("endCut", TRUE));
+                    break;
                 case TD_4550DNWB:
+
+                    mPrinterInfo.labelMargin = 10;
+                    mPrinterInfo.printQuality = PrinterInfo.PrintQuality.HIGH_RESOLUTION;
                     mPrinterInfo.isAutoCut = Boolean.parseBoolean(sharedPreferences.getString("autoCut", TRUE));
                     mPrinterInfo.isCutAtEnd = Boolean.parseBoolean(sharedPreferences.getString("endCut", TRUE));
                     break;
@@ -293,6 +320,7 @@ public abstract class BasePrint {
         mPrinterInfo.valign = PrinterInfo.VAlign.valueOf(sharedPreferences
                 .getString("valign", PrinterInfo.VAlign.TOP.name()));
         input = sharedPreferences.getString("topMargin", "");
+
         if (input.equals(""))
             input = "0";
         mPrinterInfo.margin.top = Integer.parseInt(input);
@@ -369,7 +397,7 @@ public abstract class BasePrint {
         }
 
         if (mPrinterInfo.printerModel == Model.TD_4000
-                || mPrinterInfo.printerModel == Model.TD_4100N) {
+                || mPrinterInfo.printerModel == Model.TD_4100N || mPrinterInfo.printerModel == Model.TD_2130N) {
             mPrinterInfo.isAutoCut = Boolean.parseBoolean(sharedPreferences
                     .getString("autoCut", ""));
             mPrinterInfo.isCutAtEnd = Boolean.parseBoolean(sharedPreferences
@@ -456,6 +484,8 @@ public abstract class BasePrint {
      */
     private BasePrintResult setCustomPaper() {
         BasePrintResult result;
+        Log.i(TAG,"custom paper seting");
+
         switch (mPrinterInfo.printerModel) {
             case RJ_4030:
             case RJ_4030Ai:
@@ -480,6 +510,7 @@ public abstract class BasePrint {
             case TD_4510D:
             case TD_4520DN:
             case TD_4550DNWB:
+
                 if (manualCustomPaperSettingsEnabled) {
                     result = setManualCustomPaper(mPrinterInfo.printerModel);
                 } else {
