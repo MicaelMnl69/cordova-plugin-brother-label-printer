@@ -34,6 +34,7 @@ import com.brother.ptouch.sdk.PrinterInfo.Align;
 import com.brother.ptouch.sdk.PrinterInfo.VAlign;
 import java.util.List;
 import java.util.Map;
+import java.lang.UnsatisfiedLinkError;
 
 import static com.threescreens.cordova.plugin.brotherprinter.BrotherPrinter.TAG;
 import static com.threescreens.cordova.plugin.brotherprinter.PrinterInputParameterConstant.INCLUDE_BATTERY_STATUS;
@@ -70,8 +71,14 @@ public abstract class BasePrint {
     }
 
     public static void cancel() {
-        if (mPrinter != null)
-            mPrinter.cancel();
+        if (mPrinter != null) {
+            try {
+                mPrinter.cancel();
+            } catch (UnsatisfiedLinkError e) {
+                LOG.e(TAG, "Failed to cancel print job", e);
+            }
+        }
+
         mCancel = true;
     }
 
