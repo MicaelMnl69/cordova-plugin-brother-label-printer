@@ -40,5 +40,5 @@
   },
   "homepage": "https://github.com/MenelicSoftware/cordova-plugin-brother-label-printer#readme",
   "license": "ISC",
-  "packageManager": "yarn@4.0.0"
+  "packageManager": "yarn@4.5.3"
 }
