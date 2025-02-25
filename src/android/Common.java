@@ -168,8 +168,8 @@ public class Common {
         if (extention.equalsIgnoreCase("pdz")
                 || extention.equalsIgnoreCase("blf")
                 || extention.equalsIgnoreCase("pd3")) {
-        return true;
-    }
+            return true;
+        }
         return false;
     }
 

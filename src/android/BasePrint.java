@@ -9,6 +9,7 @@ package com.brother.ptouch.sdk.printdemo.printprocess;
 
 import android.annotation.TargetApi;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.hardware.usb.UsbDevice;
@@ -35,6 +36,7 @@ import com.brother.ptouch.sdk.PrinterInfo.VAlign;
 import java.util.List;
 import java.util.Map;
 import java.lang.UnsatisfiedLinkError;
+import java.util.Set;
 
 import static com.threescreens.cordova.plugin.brotherprinter.BrotherPrinter.TAG;
 import static com.threescreens.cordova.plugin.brotherprinter.PrinterInputParameterConstant.INCLUDE_BATTERY_STATUS;
@@ -46,7 +48,6 @@ public abstract class BasePrint {
     private static final long BLE_RESOLVE_TIMEOUT = 5000;
     public static final String TRUE = Boolean.TRUE.toString();
     public static final String FALSE = Boolean.FALSE.toString();
-
     static Printer mPrinter;
     static boolean mCancel;
     final MsgHandle mHandle;
@@ -56,6 +57,7 @@ public abstract class BasePrint {
     private boolean manualCustomPaperSettingsEnabled;
     private String customSetting;
     private PrinterInfo mPrinterInfo;
+    private Throwable exception; // Variable pour stocker l'exception
 
     BasePrint(Context context, MsgHandle handle) {
         mContext = context;
@@ -164,7 +166,6 @@ public abstract class BasePrint {
     }
 
     public void setBluetoothAdapter(BluetoothAdapter bluetoothAdapter) {
-
         mPrinter.setBluetooth(bluetoothAdapter);
         mPrinter.setBluetoothLowEnergy(mContext, bluetoothAdapter, BLE_RESOLVE_TIMEOUT);
     }
@@ -285,14 +286,14 @@ public abstract class BasePrint {
                     mPrinterInfo.valign = VAlign.MIDDLE;
                     mPrinterInfo.paperPosition = Align.CENTER;
                     mPrinterInfo.printMode = PrinterInfo.PrintMode.FIT_TO_PAPER;
-                    mPrinterInfo.printQuality = PrinterInfo.PrintQuality.HIGH_RESOLUTION;
+                    mPrinterInfo.printQuality = PrinterInfo.PrintQuality.DOUBLE_SPEED;
                     mPrinterInfo.isAutoCut = Boolean.parseBoolean(sharedPreferences.getString("autoCut", TRUE));
                     mPrinterInfo.isCutAtEnd = Boolean.parseBoolean(sharedPreferences.getString("endCut", TRUE));
                     break;
                 case TD_4550DNWB:
 
                     mPrinterInfo.labelMargin = 10;
-                    mPrinterInfo.printQuality = PrinterInfo.PrintQuality.HIGH_RESOLUTION;
+                    mPrinterInfo.printQuality = PrinterInfo.PrintQuality.DOUBLE_SPEED;
                     mPrinterInfo.isAutoCut = Boolean.parseBoolean(sharedPreferences.getString("autoCut", TRUE));
                     mPrinterInfo.isCutAtEnd = Boolean.parseBoolean(sharedPreferences.getString("endCut", TRUE));
                     break;
@@ -432,21 +433,22 @@ public abstract class BasePrint {
         input = sharedPreferences.getString("processTimeout", "");
         if (input.equals(""))
             input = "60";
-        mPrinterInfo.timeout.processTimeoutSec = Integer.parseInt(input);
+        //mPrinterInfo.timeout.processTimeoutSec = Integer.parseInt(input);
+        mPrinterInfo.timeout.processTimeoutSec = 30;
 
         input = sharedPreferences.getString("sendTimeout", "");
         if (input.equals(""))
             input = "60";
-        mPrinterInfo.timeout.sendTimeoutSec = Integer.parseInt(input);
+        mPrinterInfo.timeout.sendTimeoutSec = 10;
 
         input = sharedPreferences.getString("receiveTimeout", "");
         if (input.equals(""))
             input = "180";
-        mPrinterInfo.timeout.receiveTimeoutSec = Integer.parseInt(input);
+        mPrinterInfo.timeout.receiveTimeoutSec = 20;
 
         input = sharedPreferences.getString("connectionTimeout", "");
         if (input.equals(""))
-            input = "10000";
+            input = "5000";
         mPrinterInfo.timeout.connectionWaitMSec = Integer.parseInt(input);
 
         input = sharedPreferences.getString("closeWaitTime", "");
@@ -458,13 +460,20 @@ public abstract class BasePrint {
                 .getString("useLegacyHalftoneEngine", FALSE));
     }
 
+    public static Printer getmPrinter() {
+        return mPrinter;
+    }
+
     /**
      * Launch the thread to print
      */
-    public void print() {
+    public PrinterThread print() throws Exception {
+        Log.d(TAG, "Début du print() avec port: " + mPrinterInfo.port);
+
         mCancel = false;
         PrinterThread printTread = new PrinterThread();
         printTread.start();
+        return printTread;
     }
 
     /**
@@ -480,8 +489,6 @@ public abstract class BasePrint {
      * Launch the thread to print
      */
     public void sendFile() {
-
-
         SendFileThread getTread = new SendFileThread();
         getTread.start();
     }
@@ -491,8 +498,6 @@ public abstract class BasePrint {
      */
     private BasePrintResult setCustomPaper() {
         BasePrintResult result;
-        Log.i(TAG,"custom paper seting");
-
         switch (mPrinterInfo.printerModel) {
             case RJ_4030:
             case RJ_4030Ai:
@@ -517,7 +522,6 @@ public abstract class BasePrint {
             case TD_4510D:
             case TD_4520DN:
             case TD_4550DNWB:
-
                 if (manualCustomPaperSettingsEnabled) {
                     result = setManualCustomPaper(mPrinterInfo.printerModel);
                 } else {
@@ -726,6 +730,7 @@ public abstract class BasePrint {
         }
     }
 
+
     /**
      * Thread for printing
      */
@@ -736,9 +741,7 @@ public abstract class BasePrint {
                 // set info. for printing
                 BasePrintResult setPrinterInfoResult = setPrinterInfo();
                 if (setPrinterInfoResult.success == false) {
-                    mHandle.setResult(setPrinterInfoResult.errorMessage);
-                    mHandle.sendMessage(mHandle.obtainMessage(Common.MSG_PRINT_END));
-                    return;
+                    throw new Exception(setPrinterInfoResult.errorMessage);
                 }
 
                 // start message
@@ -747,7 +750,12 @@ public abstract class BasePrint {
 
                 mPrintResult = new PrinterStatus();
 
+                if(mPrinter.getPrinterStatus().errorCode != ErrorCode.ERROR_NONE){
+                    throw new Exception(mPrinter.getPrinterStatus().errorCode.toString());
+                }
+                Log.d(TAG, "Start connexion: " + mPrinter.getPrinterStatus().errorCode);
                 mPrinter.startCommunication();
+
                 if (!mCancel) {
                     doPrint();
                 } else {
@@ -762,9 +770,13 @@ public abstract class BasePrint {
                 mHandle.sendMessage(msg);
 
             } catch (Throwable throwable) {
-                handleUnexpectedError("Failed to print:", throwable);
+                exception = throwable;
             }
         }
+    }
+
+    public Throwable getException() {
+        return exception;
     }
 
     /**
@@ -822,7 +834,7 @@ public abstract class BasePrint {
                 mPrinter.startCommunication();
 
                 doPrint();
-
+                Log.d(TAG, "Vérification de la mémoire tampon de l'imprimante: " + mPrinter.getPrinterStatus().errorCode);
                 mPrinter.endCommunication();
                 // end message
                 mHandle.setResult(showResult());

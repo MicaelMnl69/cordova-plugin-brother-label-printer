@@ -50,9 +50,16 @@ import com.brother.ptouch.sdk.Printer;
 import com.brother.ptouch.sdk.PrinterInfo;
 import com.brother.ptouch.sdk.PrinterStatus;
 import com.brother.ptouch.sdk.printdemo.common.MsgHandle;
+import com.brother.ptouch.sdk.printdemo.printprocess.BasePrint;
 import com.brother.ptouch.sdk.printdemo.printprocess.ImageBitmapPrint;
 import com.brother.ptouch.sdk.printdemo.printprocess.ImageFilePrint;
+
 import static com.threescreens.cordova.plugin.brotherprinter.PrinterInputParameterConstant.INCLUDE_BATTERY_STATUS;
+
+import androidx.core.app.ActivityCompat;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class BrotherPrinter extends CordovaPlugin {
     //token to make it easy to grep logcat
@@ -69,15 +76,33 @@ public class BrotherPrinter extends CordovaPlugin {
             PrinterInfo.Model.TD_4550DNWB
     };
 
+    private CallbackContext lastCallbackContext;
     private MsgHandle mHandle;
     private ImageBitmapPrint mBitmapPrint;
     private ImageFilePrint mFilePrint;
 
     private final static int PERMISSION_WRITE_EXTERNAL_STORAGE = 1;
+    private static final int REQUEST_CODE_BLUETOOTH_PERMISSIONS = 1001; // Code de demande de permission
 
     private boolean isPermitWriteStorage() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (cordova.getActivity().checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean isBluetoothPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+
+            if (cordova.getActivity().checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                    != PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+        } else {
+            if (cordova.getActivity().checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
                     != PackageManager.PERMISSION_GRANTED) {
                 return false;
             }
@@ -96,6 +121,7 @@ public class BrotherPrinter extends CordovaPlugin {
             if (!isPermitWriteStorage()) {
                 cordova.requestPermission(this, PERMISSION_WRITE_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE);
             }
+
         } catch (Throwable t) {
             LOG.e(TAG, "Failed to initialize label printer " + t);
         }
@@ -169,6 +195,8 @@ public class BrotherPrinter extends CordovaPlugin {
             modelName = device.getName();
 
             String deviceName = device.getName();
+
+            Log.e(TAG, "device name: " + deviceName);
             PrinterInfo.Model[] models = PrinterInfo.Model.values();
             for (PrinterInfo.Model model : models) {
                 String modelName = model.toString().replaceAll("_", "-");
@@ -190,10 +218,10 @@ public class BrotherPrinter extends CordovaPlugin {
             PrinterInfo.Model[] models = PrinterInfo.Model.values();
             for (PrinterInfo.Model model : models) {
                 String modelName = model.toString().replaceAll("_", "-");
-                Log.i(TAG, "modelName : "+modelName);
+                Log.i(TAG, "modelName : " + modelName);
 
                 if (printer.modelName.endsWith(modelName)) {
-                    Log.i(TAG, "model : "+model);
+                    Log.i(TAG, "model : " + model);
 
                     this.model = model;
                     break;
@@ -249,7 +277,7 @@ public class BrotherPrinter extends CordovaPlugin {
                 leftMargin = object.getString("leftMargin");
             }
 
-            if(object.has("customPaperFilePath")) {
+            if (object.has("customPaperFilePath")) {
                 customPaperFilePath = object.getString("customPaperFilePath");
             }
 
@@ -303,13 +331,11 @@ public class BrotherPrinter extends CordovaPlugin {
     }
 
     private List<DiscoveredPrinter> enumerateBluetoothPrinters(final CallbackContext callbackctx) {
-
         ArrayList<DiscoveredPrinter> results = new ArrayList<>();
         try {
             BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
             if (bluetoothAdapter == null) {
                 sendError(callbackctx, null, "No Bluetooth adapter found.");
-
                 return results;
             }
 
@@ -321,14 +347,54 @@ public class BrotherPrinter extends CordovaPlugin {
                 cordova.getActivity().startActivity(enableBtIntent);
             }
 
+            // Vérifier la permission BLUETOOTH_CONNECT pour Android 12 et supérieur
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Vérifier les permissions BLUETOOTH_CONNECT et BLUETOOTH_SCAN pour Android 12 et supérieur
+                if (ActivityCompat.checkSelfPermission(cordova.getActivity(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED ||
+                        ActivityCompat.checkSelfPermission(cordova.getActivity(), Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
+                        ActivityCompat.checkSelfPermission(cordova.getActivity(), Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED
+
+                ) {
+                    Log.d(TAG, "REQUESTED PERMISSIONS");
+
+                    // Demander les permissions
+                    ActivityCompat.requestPermissions(cordova.getActivity(), new String[]{
+                            Manifest.permission.BLUETOOTH_CONNECT,
+                            Manifest.permission.BLUETOOTH_ADMIN,
+                            Manifest.permission.BLUETOOTH_SCAN
+                    }, 1001);
+
+                }
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                Log.d(TAG, "REQUEST PERMISSIONS 2");
+
+                // Vérifier la permission ACCESS_FINE_LOCATION pour Android 10 et supérieur
+                if (ActivityCompat.checkSelfPermission(cordova.getActivity(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    // Demander la permission
+                    ActivityCompat.requestPermissions(cordova.getActivity(), new String[]{
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.BLUETOOTH_ADMIN,
+                                    Manifest.permission.BLUETOOTH_CONNECT
+                            },
+                            1001
+                    );
+                }
+            }
+
+            // Obtenir les appareils Bluetooth appairés
             Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
             if (pairedDevices == null || pairedDevices.size() == 0) {
                 sendError(callbackctx, null, "No paired Bluetooth devices found.");
-
                 return results;
             }
 
+            // Énumérer les appareils Bluetooth appairés
             for (BluetoothDevice device : pairedDevices) {
+
+                if (device.getName() == null) {
+                    continue;
+                }
+
                 DiscoveredPrinter printer = new DiscoveredPrinter(device);
 
                 if (printer.model == null) {
@@ -338,7 +404,7 @@ public class BrotherPrinter extends CordovaPlugin {
                 results.add(printer);
             }
         } catch (Exception e) {
-            sendError(callbackctx, e,   "Error enumerating Bluetooth printers");
+            sendError(callbackctx, e, "Error enumerating Bluetooth printers");
         }
 
         return results;
@@ -364,17 +430,64 @@ public class BrotherPrinter extends CordovaPlugin {
         cordova.getThreadPool().execute(new Runnable() {
             public void run() {
                 try {
-                    List<DiscoveredPrinter> discoveredPrinters = enumerateNetPrinters();
-                    sendDiscoveredPrinters(callbackctx, discoveredPrinters);
+                    Log.d(TAG, "Début de la recherche des imprimantes réseau...");
+
+                    List<DiscoveredPrinter> discoveredPrinters = new ArrayList<>();
+                    int maxAttempts = 3; // Nombre de tentatives
+                    int waitTime = 2500; // Attente entre les tentatives (en ms)
+
+                    for (int i = 0; i < maxAttempts; i++) {
+
+                        // Exécuter la recherche
+                        List<DiscoveredPrinter> newPrinters = enumerateNetPrinters();
+                        discoveredPrinters.addAll(newPrinters);
+
+                        // Si on a trouvé des imprimantes, on arrête la boucle
+                        if (!newPrinters.isEmpty()) {
+                            break;
+                        }
+
+                        Thread.sleep(waitTime);
+                    }
+
+                    // Envoi des résultats
+                    if (!discoveredPrinters.isEmpty()) {
+                        sendDiscoveredPrinters(callbackctx, discoveredPrinters);
+                    } else {
+                        Log.w(TAG, "Aucune imprimante trouvée après " + maxAttempts + " tentatives.");
+                        throw new Exception("Aucune imprimante détectée");
+                    }
                 } catch (Throwable t) {
-                    sendError(callbackctx, t, "Failed to find network printer");
+                    Log.e(TAG, "Erreur lors de la recherche des imprimantes réseau", t);
+                    PluginResult result = new PluginResult(PluginResult.Status.ERROR, t.getMessage());
+                    callbackctx.sendPluginResult(result);
                 }
             }
-
         });
     }
 
+    private void requestBluetoothPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            cordova.requestPermissions(this, REQUEST_CODE_BLUETOOTH_PERMISSIONS, new String[]{
+                    Manifest.permission.BLUETOOTH_CONNECT,
+                    Manifest.permission.BLUETOOTH_SCAN
+            });
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            cordova.requestPermissions(this, REQUEST_CODE_BLUETOOTH_PERMISSIONS, new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION
+            });
+        }
+    }
+
     private void findBluetoothPrinters(final CallbackContext callbackctx) {
+        lastCallbackContext = callbackctx; // ✅ Sauvegarde du callback
+
+        if (!isBluetoothPermissions()) {
+            Log.d(TAG, "Bluetooth permissions not granted. Requesting permissions 1.");
+            requestBluetoothPermissions();
+            Log.d(TAG, "Bluetooth permissions not granted. Requesting permissions.");
+            return;
+        }
 
         cordova.getThreadPool().execute(new Runnable() {
             @Override
@@ -424,7 +537,7 @@ public class BrotherPrinter extends CordovaPlugin {
             editor.putString("topMargin", printer.topMargin);
             editor.putString("leftMargin", printer.leftMargin);
 
-            if(printer.customPaperFilePath != null && !printer.customPaperFilePath.isEmpty()) {
+            if (printer.customPaperFilePath != null && !printer.customPaperFilePath.isEmpty()) {
                 String targetBinFolder = cordova.getActivity()
                         .getExternalFilesDir("customPaperFileSet/").toString();
                 copyBinFile("public/" + printer.customPaperFilePath, targetBinFolder);
@@ -461,66 +574,97 @@ public class BrotherPrinter extends CordovaPlugin {
         }
     }
 
+
+    private final ExecutorService printExecutor = Executors.newSingleThreadExecutor(); // Un seul thread pour les impressions
+
+
     private void printViaSDK(final JSONArray args, final CallbackContext callbackctx) {
-        cordova.getThreadPool().execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    SharedPreferences sharedPreferences = PreferenceManager
-                            .getDefaultSharedPreferences(cordova.getActivity());
+        printExecutor.execute(() -> {
+            try {
+                /*PrinterInfo.ErrorCode errorCode = BasePrint.getmPrinter().getPrinterStatus().errorCode;
 
-                    String port = sharedPreferences.getString("port", "");
-                    if ("".equals(port)) {
-                        PluginResult result = new PluginResult(PluginResult.Status.ERROR, "No printer has been set.");
-                        callbackctx.sendPluginResult(result);
-                        return;
-                    }
+                if (errorCode != PrinterInfo.ErrorCode.ERROR_NONE){
+                    Log.d(TAG, "Is bluethoot connecxion");
 
-                    if (PrinterInfo.Port.BLUETOOTH.toString().equals(port)) {
-                        BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-                        if (bluetoothAdapter == null) {
-                            PluginResult result = new PluginResult(PluginResult.Status.ERROR, "This device does not have a bluetooth adapter.");
-                            callbackctx.sendPluginResult(result);
-                            return;
-                        }
+                    PluginResult result = new PluginResult(PluginResult.Status.ERROR, "No printer has been set.");
+                    callbackctx.sendPluginResult(result);
+                    return;
+                }*/
 
-                        if (!bluetoothAdapter.isEnabled()) {
-                            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-                            enableBtIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                            cordova.getActivity().startActivity(enableBtIntent);
-                        }
+                // Récupérer les préférences de l'imprimante
+                SharedPreferences sharedPreferences = PreferenceManager
+                        .getDefaultSharedPreferences(cordova.getActivity());
 
-                        mBitmapPrint.setBluetoothAdapter(bluetoothAdapter);
-                        mFilePrint.setBluetoothAdapter(bluetoothAdapter);
-                    }
-
-                    Bitmap bitmap = null;
-                    try {
-                        String encodedImg = args.getString(0);
-                        bitmap = bmpFromBase64(encodedImg);
-                    } catch (JSONException e) {
-                        sendError(callbackctx, e, "An error occurred while trying to retrieve the image passed in.");
-                        return;
-                    }
-
-                    if (bitmap == null) {
-                        PluginResult result = new PluginResult(PluginResult.Status.ERROR, "The passed in data did not seem to be a decodable image. Please ensure it is a base64 encoded string of a supported Android format");
-                        callbackctx.sendPluginResult(result);
-                        return;
-                    }
-
-                    mHandle.setCallbackContext(callbackctx);
-
-                    List<Bitmap> bitmaps = new ArrayList<Bitmap>();
-                    bitmaps.add(bitmap);
-
-                    mBitmapPrint.setBitmaps(bitmaps);
-                    mBitmapPrint.print();
-
-                } catch (Throwable t) {
-                    sendError(callbackctx, t, "Failed to printViaSDK ");
+                String port = sharedPreferences.getString("port", "");
+                if ("".equals(port)) {
+                    PluginResult result = new PluginResult(PluginResult.Status.ERROR, "No printer has been set.");
+                    callbackctx.sendPluginResult(result);
+                    return;
                 }
 
+                // Configurer Bluetooth si nécessaire
+                if (PrinterInfo.Port.BLUETOOTH.toString().equals(port)) {
+
+                    Log.d(TAG, "Is bluethoot connecxion");
+
+                    BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+                    if (bluetoothAdapter == null) {
+                        PluginResult result = new PluginResult(PluginResult.Status.ERROR, "This device does not have a bluetooth adapter.");
+                        callbackctx.sendPluginResult(result);
+                        return;
+                    }
+
+                    if (!bluetoothAdapter.isEnabled()) {
+                        Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+                        enableBtIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        cordova.getActivity().startActivity(enableBtIntent);
+                    }
+
+                    mBitmapPrint.setBluetoothAdapter(bluetoothAdapter);
+                    mFilePrint.setBluetoothAdapter(bluetoothAdapter);
+                }
+
+                // Décoder l'image
+                Bitmap bitmap = null;
+                try {
+                    String encodedImg = args.getString(0);
+                    bitmap = bmpFromBase64(encodedImg);
+                } catch (JSONException e) {
+                    sendError(callbackctx, e, "An error occurred while trying to retrieve the image passed in.");
+                    return;
+                }
+
+                if (bitmap == null) {
+                    PluginResult result = new PluginResult(PluginResult.Status.ERROR, "The passed in data did not seem to be a decodable image. Please ensure it is a base64 encoded string of a supported Android format");
+                    callbackctx.sendPluginResult(result);
+                    return;
+                }
+
+                // Configurer et imprimer l'image
+                mHandle.setCallbackContext(callbackctx);
+
+                List<Bitmap> bitmaps = new ArrayList<>();
+                bitmaps.add(bitmap);
+
+                mBitmapPrint.setBitmaps(bitmaps);
+
+                Thread printThread = mBitmapPrint.print();
+
+                printThread.join();
+
+                if (mBitmapPrint.getException() != null) {
+                    PluginResult result = new PluginResult(PluginResult.Status.ERROR, mBitmapPrint.getException().getMessage());
+                    callbackctx.sendPluginResult(result);
+                    return;
+                }
+
+                callbackctx.success("Printing completed successfully.");
+
+            } catch (Throwable t) {
+                sendError(callbackctx, t, "Failed to printViaSDK ");
+            } finally {
+                mHandle.setCallbackContext(null);
+                mBitmapPrint.setBitmaps(null);
             }
         });
     }
@@ -632,7 +776,7 @@ public class BrotherPrinter extends CordovaPlugin {
         try {
             in = assetManager.open(filename);
 
-            newFileName = targetPath + filename.substring(filename.lastIndexOf("/")+1);
+            newFileName = targetPath + filename.substring(filename.lastIndexOf("/") + 1);
 
             out = new FileOutputStream(newFileName);
 
@@ -646,7 +790,7 @@ public class BrotherPrinter extends CordovaPlugin {
             out.flush();
             out.close();
             out = null;
-            Log.i("Brother/SDKEvent", "file copied :"+filename);
+            Log.i("Brother/SDKEvent", "file copied :" + filename);
 
         } catch (Exception e) {
             Log.e("Brother/SDKEvent", "Exception in copyBinFile() " + e.toString());
