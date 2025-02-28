@@ -364,13 +364,35 @@ public class BrotherPrinter extends CordovaPlugin {
         cordova.getThreadPool().execute(new Runnable() {
             public void run() {
                 try {
-                    List<DiscoveredPrinter> discoveredPrinters = enumerateNetPrinters();
-                    sendDiscoveredPrinters(callbackctx, discoveredPrinters);
+
+                    List<DiscoveredPrinter> discoveredPrinters = new ArrayList<>();
+                    int maxAttempts = 3; // Nombre de tentatives
+                    int waitTime = 2500; // Attente entre les tentatives (en ms)
+
+                    for (int i = 0; i < maxAttempts; i++) {
+
+                        // Exécuter la recherche
+                        List<DiscoveredPrinter> newPrinters = enumerateNetPrinters();
+                        discoveredPrinters.addAll(newPrinters);
+
+                        // Si on a trouvé des imprimantes, on arrête la boucle
+                        if (!newPrinters.isEmpty()) {
+                            break;
+                        }
+
+                        Thread.sleep(waitTime);
+                    }
+
+                    // Envoi des résultats
+                    if (!discoveredPrinters.isEmpty()) {
+                        sendDiscoveredPrinters(callbackctx, discoveredPrinters);
+                    } else {
+                        throw new Exception("Aucune imprimante détectée");
+                    }
                 } catch (Throwable t) {
                     sendError(callbackctx, t, "Failed to find network printer");
                 }
             }
-
         });
     }
 

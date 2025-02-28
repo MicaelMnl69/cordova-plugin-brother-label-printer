@@ -205,23 +205,23 @@
 #pragma mark - Plugin Commands
 
 - (void)findNetworkPrinters:(CDVInvokedUrlCommand *)command {
-  //  NSLog(@"==== in findNetworkPrinters with callback id                = %@", command.callbackId);
+    // NSLog(@"==== in findNetworkPrinters with callback id = %@", command.callbackId);
 
-//	[self.commandDelegate runInBackground:^{
-    [self networkPrintersWithCompletion:^(NSArray *networkPrinters, NSError *error) {
-        if (error) {
+    // Utilisation de DispatchQueue pour gérer le délai
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2500 * NSEC_PER_MSEC)), dispatch_get_main_queue(), ^{
+        [self networkPrintersWithCompletion:^(NSArray *networkPrinters, NSError *error) {
+            if (error) {
+                [self.commandDelegate
+                        sendPluginResult:[CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:[error localizedDescription]]
+                              callbackId:command.callbackId];
+                return;
+            }
+
             [self.commandDelegate
-                    sendPluginResult:[CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:[error localizedDescription]]
+                    sendPluginResult:[CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:networkPrinters]
                           callbackId:command.callbackId];
-            return;
-        }
-
-        [self.commandDelegate
-                sendPluginResult:[CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:networkPrinters]
-                      callbackId:command.callbackId];
-
-    }];
-//    }];
+        }];
+    });
 }
 
 - (void)findBluetoothPrinters:(CDVInvokedUrlCommand *)command {
